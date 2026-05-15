@@ -467,6 +467,7 @@
     let userRegion = "";
     let sessionDistance = "";
     let isRecordingGlobal = false;
+    let isAudioPlaying = false;
 
     function startApp() {
       const nameInput = document.getElementById('userNameInput').value.trim();
@@ -530,12 +531,12 @@
           buttonsHtml = `<button class="stop-btn" onclick="stopRecording()">⏹ Stop</button>`;
         } else if (isCompleted) {
           buttonsHtml = `
-        <button class="play-btn" onclick="playRecording('${key}')">▶ Play</button>
-        <button class="rerecord-btn" onclick="reRecord('${key}', ${index})" ${isRecordingGlobal ? 'disabled' : ''}>🔄 Re-record</button>
+        <button class="play-btn" onclick="playRecording('${key}')" ${isRecordingGlobal || isAudioPlaying ? 'disabled' : ''}>▶ Play</button>
+        <button class="rerecord-btn" onclick="reRecord('${key}', ${index})" ${isRecordingGlobal || isAudioPlaying ? 'disabled' : ''}>🔄 Re-record</button>
       `;
         } else {
           buttonsHtml = `
-        <button class="record-btn" onclick="startRecording(${index})" ${isRecordingGlobal ? 'disabled' : ''}>🎙 Record</button>
+        <button class="record-btn" onclick="startRecording(${index})" ${isRecordingGlobal || isAudioPlaying ? 'disabled' : ''}>🎙 Record</button>
       `;
         }
 
@@ -575,7 +576,7 @@
     }
 
     async function startRecording(index) {
-      if (isRecordingGlobal) return;
+      if (isRecordingGlobal || isAudioPlaying) return;
 
       try {
         if (!mediaStream) {
@@ -625,11 +626,22 @@
       };
 
       currentRecordingIndex = null;
+      isAudioPlaying = true;
       renderPage();
+
+      const audio = new Audio(URL.createObjectURL(wavBlob));
+      audio.onended = () => {
+        isAudioPlaying = false;
+        renderPage();
+      };
+      audio.play().catch(e => {
+        isAudioPlaying = false;
+        renderPage();
+      });
     }
 
     function reRecord(key, index) {
-      if (isRecordingGlobal) return;
+      if (isRecordingGlobal || isAudioPlaying) return;
 
       delete recordings[key];
       renderPage();
@@ -651,17 +663,26 @@
     }
 
     function playRecording(key) {
-      if (!recordings[key]) {
-        alert('No recording found');
+      if (!recordings[key] || isRecordingGlobal || isAudioPlaying) {
         return;
       }
+      isAudioPlaying = true;
+      renderPage();
+
       const audio = new Audio(URL.createObjectURL(recordings[key].blob));
-      audio.play();
+      audio.onended = () => {
+        isAudioPlaying = false;
+        renderPage();
+      };
+      audio.play().catch(e => {
+        isAudioPlaying = false;
+        renderPage();
+      });
     }
 
     function nextPage() {
-      if (isRecordingGlobal) {
-        alert("Please stop recording before changing pages.");
+      if (isRecordingGlobal || isAudioPlaying) {
+        alert("Please wait for recording or playback to finish.");
         return;
       }
 
@@ -686,8 +707,8 @@
     }
 
     function prevPage() {
-      if (isRecordingGlobal) {
-        alert("Please stop recording before changing pages.");
+      if (isRecordingGlobal || isAudioPlaying) {
+        alert("Please wait for recording or playback to finish.");
         return;
       }
       if (currentPage > 0) {
