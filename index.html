@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hey Genie Voice Recorder</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: white;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    #setupOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.95);
+      z-index: 1000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+    }
+
+    .setup-box {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 30px;
+      text-align: center;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .setup-box h2 {
+      margin-bottom: 10px;
+      font-size: 24px;
+    }
+
+    .setup-box p {
+      margin-bottom: 20px;
+      color: #cbd5e1;
+    }
+
+    .setup-box input,
+    .setup-box select {
+      width: 100%;
+      padding: 14px;
+      margin: 10px 0;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.2);
+      color: white;
+      font-size: 16px;
+      outline: none;
+    }
+
+    .setup-box select option {
+      background: #1e293b;
+      color: white;
+    }
+
+    .setup-box button {
+      width: 100%;
+      background: #3b82f6;
+      color: white;
+      padding: 14px;
+      font-size: 18px;
+      margin-top: 15px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+
+    .setup-box button:hover {
+      background: #2563eb;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      display: none;
+      /* hidden until setup is complete */
+    }
+
+    .sticky-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(15px);
+      padding: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-top-left-radius: 24px;
+      border-top-right-radius: 24px;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    h1 {
+      font-size: 24px;
+    }
+
+    .badge {
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #22c55e;
+      color: white;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .page-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .page-card {
+      background: rgba(255, 255, 255, 0.07);
+      border-radius: 12px;
+      padding: 10px 15px;
+      font-size: 14px;
+      flex: 1;
+      text-align: center;
+      min-width: 100px;
+    }
+
+    .content-body {
+      padding: 20px;
+    }
+
+    .record-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .record-card {
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 18px;
+      padding: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: 0.3s;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .record-card.active-recording {
+      border: 2px solid #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+    }
+
+    .record-card.completed {
+      border: 2px solid #22c55e;
+      background: rgba(34, 197, 94, 0.1);
+    }
+
+    .record-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #f8fafc;
+    }
+
+    .indicator-area {
+      min-height: 24px;
+      margin-bottom: 10px;
+    }
+
+    .recording-indicator {
+      color: #ef4444;
+      font-weight: bold;
+      font-size: 14px;
+      animation: blink 1s infinite;
+      display: none;
+    }
+
+    .completed-badge-text {
+      color: #22c55e;
+      font-weight: bold;
+      font-size: 14px;
+      display: none;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 16px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s;
+      font-size: 15px;
+      flex: 1;
+      text-align: center;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .record-btn {
+      background: #ef4444;
+      color: white;
+    }
+
+    .stop-btn {
+      background: #f59e0b;
+      color: white;
+    }
+
+    .play-btn {
+      background: #3b82f6;
+      color: white;
+    }
+
+    .rerecord-btn {
+      background: #64748b;
+      color: white;
+    }
+
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 30px;
+      gap: 15px;
+    }
+
+    .nav button {
+      background: #22c55e;
+      color: white;
+      font-size: 16px;
+    }
+
+    .download-section {
+      margin-top: 30px;
+      display: none;
+      gap: 15px;
+      flex-direction: column;
+    }
+
+    .download-section button {
+      background: #8b5cf6;
+      color: white;
+      font-size: 18px;
+      padding: 16px;
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 15px;
+      border-radius: 8px;
+    }
+
+    .footer {
+      margin-top: 25px;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 13px;
+    }
+
+    @media(max-width: 480px) {
+      body {
+        padding: 10px;
+      }
+
+      .sticky-header {
+        padding: 15px;
+        border-top-left-radius: 20px;
+        border-top-right-radius: 20px;
+      }
+
+      .container {
+        border-radius: 20px;
+      }
+
+      h1 {
+        font-size: 20px;
+      }
+
+      .badge {
+        font-size: 12px;
+      }
+
+      .record-card {
+        padding: 15px;
+      }
+
+      button {
+        padding: 10px 12px;
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="setupOverlay">
+    <div class="setup-box">
+      <h2>Welcome to Biswas Tech Audio Recorder</h2>
+      <p>Please enter your details to start recording.</p>
+      <input type="text" id="speakerIdInput" placeholder="Enter Speaker ID (e.g. spk001)" required />
+      <select id="userGenderInput" required>
+        <option value="" disabled selected>Select Gender</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+      </select>
+      <input type="number" id="userAgeInput" placeholder="Enter Age (e.g. 23)" required />
+      <input type="text" id="userRegionInput" placeholder="Enter Region (e.g. Noida)" required />
+      <button onclick="startApp()">Continue</button>
+    </div>
+  </div>
+
+  <div class="container" id="mainContainer">
+    <div class="sticky-header">
+      <div class="header-top">
+        <h1>🎤 Biswas Tech Audio Recorder</h1>
+        <div class="badge" id="progressBadge">0 / 84 Recorded</div>
+      </div>
+      <div class="page-info">
+        <div class="page-card"><strong>Page:</strong> <span id="pageNumber">1</span> / 6</div>
+        <div class="page-card"><strong>Speed:</strong> <span id="speedLabel"></span></div>
+        <div class="page-card"><strong>Tone:</strong> <span id="toneLabel"></span></div>
+      </div>
+    </div>
+
+    <div class="content-body">
+      <div class="record-grid" id="recordGrid"></div>
+
+      <div class="nav">
+        <button onclick="prevPage()">⬅ Previous</button>
+        <button onclick="nextPage()">Next ➡</button>
+      </div>
+
+      <div class="download-section" id="downloadSection">
+        <button onclick="downloadZip()">⬇ Download ZIP</button>
+        <button onclick="shareZip()">📤 Share to Telegram</button>
+      </div>
+
+      <div class="footer">
+        <p>WAV Format • 44.1kHz • Mono • Browser Based Recorder</p>
+        <p style="margin-top: 10px;">&copy; All copyrights reserved for 2026</p>
+        <div style="margin-top: 15px; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+          <a href="mailto:Biswastechx@gmail.com"
+            style="color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 5px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+            </svg> Biswastechx@gmail.com
+          </a>
+          <a href="https://wa.me/919093847448"
+            style="color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 5px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path
+                d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z">
+              </path>
+            </svg> +919093847448
+          </a>
+          <a href="https://www.facebook.com/profile.php?id=61585037183145" target="_blank"
+            style="color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 5px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+            </svg> Facebook
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+
+    const commandWords = [
+      "Hey Genie",
+      "Hey Genie",
+      "Hey Genie Take Photo",
+      "Hey Genie Pickup call",
+      "Hey Genie Reject call",
+      "Hey Genie capture video",
+      "Hey Genie end capture",
+      "Hey Genie Send SOS",
+      "Hey Genie Record Audio",
+      "Hey Genie Stop Audio",
+      "Hey Genie Resume song",
+      "Hey Genie Pause song",
+      "Hey Genie Next Song",
+      "Hey Genie Replay Song"
+    ];
+
+    const pages = [
+      { speed: "Fast", tone: "Low", shortName: "s1" },
+      { speed: "Fast", tone: "High", shortName: "s2" },
+      { speed: "Fast", tone: "Normal", shortName: "s3" },
+      { speed: "Normal", tone: "Low", shortName: "s4" },
+      { speed: "Normal", tone: "High", shortName: "s5" },
+      { speed: "Normal", tone: "Normal", shortName: "s6" }
+    ];
+
+    let currentPage = 0;
+    let mediaStream;
+    let audioContext;
+    let processor;
+    let input;
+    let recordingBuffers = [];
+    let currentRecordingIndex = null;
+    let recordings = {};
+    let currentRecorderData = [];
+
+    // New State Variables
+    let speakerId = "";
+    let userGender = "";
+    let userAge = "";
+    let userRegion = "";
+    let sessionDistance = "";
+    let isRecordingGlobal = false;
+
+    function startApp() {
+      const speakerIdInput = document.getElementById('speakerIdInput').value.trim();
+      const genderInput = document.getElementById('userGenderInput').value;
+      const ageInput = document.getElementById('userAgeInput').value.trim();
+      const regionInput = document.getElementById('userRegionInput').value.trim();
+
+      if (!speakerIdInput || !genderInput || !ageInput || !regionInput) {
+        alert("Please fill all details to continue.");
+        return;
+      }
+
+      speakerId = speakerIdInput.replace(/[^a-zA-Z0-9]/g, '');
+      userGender = genderInput;
+      userAge = ageInput.replace(/[^0-9]/g, '');
+      userRegion = regionInput.replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+
+      const distances = [15, 20, 25];
+      sessionDistance = distances[Math.floor(Math.random() * distances.length)] + "cm";
+
+      document.getElementById('setupOverlay').style.display = 'none';
+      document.getElementById('mainContainer').style.display = 'block';
+
+      renderPage();
+    }
+
+    async function initMic() {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+
+    function renderPage() {
+      document.getElementById('pageNumber').innerText = currentPage + 1;
+      document.getElementById('speedLabel').innerText = pages[currentPage].speed;
+      document.getElementById('toneLabel').innerText = pages[currentPage].tone;
+
+      const grid = document.getElementById('recordGrid');
+      grid.innerHTML = '';
+
+      commandWords.forEach((text, index) => {
+        const key = `page${currentPage}_record${index}`;
+        const isCompleted = !!recordings[key];
+        const isThisRecordingActive = (isRecordingGlobal && currentRecordingIndex === index);
+
+        const card = document.createElement('div');
+        card.className = 'record-card';
+
+        if (isCompleted) card.classList.add('completed');
+        if (isThisRecordingActive) card.classList.add('active-recording');
+
+        let indicatorHtml = '';
+        if (isThisRecordingActive) {
+          indicatorHtml = `<div class="recording-indicator" style="display:block;">🔴 Recording...</div>`;
+        } else if (isCompleted) {
+          indicatorHtml = `<div class="completed-badge-text" style="display:block;">✅ Completed</div>`;
+        }
+
+        let buttonsHtml = '';
+        if (isThisRecordingActive) {
+          buttonsHtml = `<button class="stop-btn" onclick="stopRecording()">⏹ Stop</button>`;
+        } else if (isCompleted) {
+          buttonsHtml = `
+        <button class="play-btn" onclick="playRecording('${key}')">▶ Play</button>
+        <button class="rerecord-btn" onclick="reRecord('${key}', ${index})" ${isRecordingGlobal ? 'disabled' : ''}>🔄 Re-record</button>
+      `;
+        } else {
+          buttonsHtml = `
+        <button class="record-btn" onclick="startRecording(${index})" ${isRecordingGlobal ? 'disabled' : ''}>🎙 Record</button>
+      `;
+        }
+
+        card.innerHTML = `
+      <div>
+        <div class="record-title">${index + 1}. ${text}</div>
+        <div class="indicator-area">${indicatorHtml}</div>
+        <div class="buttons">
+          ${buttonsHtml}
+        </div>
+      </div>
+      <audio id="audio_${key}" controls style="display:${isCompleted ? 'block' : 'none'}"></audio>
+    `;
+
+        grid.appendChild(card);
+
+        // Set audio source if completed
+        if (isCompleted) {
+          const audioEl = card.querySelector(`#audio_${key}`);
+          audioEl.src = URL.createObjectURL(recordings[key].blob);
+        }
+      });
+
+      updateProgress();
+
+      const totalCompleted = Object.keys(recordings).length;
+      if (totalCompleted === 84) {
+        document.getElementById('downloadSection').style.display = 'flex';
+      } else {
+        document.getElementById('downloadSection').style.display = 'none';
+      }
+    }
+
+    function updateProgress() {
+      const total = Object.keys(recordings).length;
+      document.getElementById('progressBadge').innerText = `${total} / 84 Recorded`;
+    }
+
+    async function startRecording(index) {
+      if (isRecordingGlobal) return;
+
+      try {
+        if (!mediaStream) {
+          await initMic();
+        }
+      } catch (err) {
+        alert("Microphone access denied. Please allow microphone access.");
+        return;
+      }
+
+      isRecordingGlobal = true;
+      currentRecordingIndex = index;
+      currentRecorderData = [];
+
+      audioContext = new AudioContext({ sampleRate: 44100 });
+      input = audioContext.createMediaStreamSource(mediaStream);
+      processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+      processor.onaudioprocess = (e) => {
+        const data = e.inputBuffer.getChannelData(0);
+        currentRecorderData.push(new Float32Array(data));
+      };
+
+      input.connect(processor);
+      processor.connect(audioContext.destination);
+
+      renderPage();
+    }
+
+    function stopRecording() {
+      if (!processor || !isRecordingGlobal) return;
+
+      processor.disconnect();
+      input.disconnect();
+
+      isRecordingGlobal = false;
+
+      const wavBlob = encodeWAV(currentRecorderData, 44100);
+      const key = `page${currentPage}_record${currentRecordingIndex}`;
+
+      recordings[key] = {
+        blob: wavBlob,
+        text: commandWords[currentRecordingIndex],
+        speed: pages[currentPage].speed,
+        tone: pages[currentPage].tone,
+        filename: generateFileName(currentPage, currentRecordingIndex)
+      };
+
+      currentRecordingIndex = null;
+      renderPage();
+    }
+
+    function reRecord(key, index) {
+      if (isRecordingGlobal) return;
+
+      delete recordings[key];
+      renderPage();
+    }
+
+    function generateFileName(page, index) {
+      const shortName = pages[page].shortName;
+      const commandText = commandWords[index];
+
+      let repCount = 1;
+      for (let i = 0; i < index; i++) {
+        if (commandWords[i] === commandText) {
+          repCount++;
+        }
+      }
+      const repString = String(repCount).padStart(2, '0');
+
+      return `${commandText}_${sessionDistance}_${speakerId}_${userGender.toLowerCase()}_${userAge}_${userRegion}_${shortName}_${repString}.wav`;
+    }
+
+    function playRecording(key) {
+      if (!recordings[key]) {
+        alert('No recording found');
+        return;
+      }
+      const audio = new Audio(URL.createObjectURL(recordings[key].blob));
+      audio.play();
+    }
+
+    function nextPage() {
+      if (isRecordingGlobal) {
+        alert("Please stop recording before changing pages.");
+        return;
+      }
+
+      let allDone = true;
+      for (let i = 0; i < commandWords.length; i++) {
+        if (!recordings[`page${currentPage}_record${i}`]) {
+          allDone = false;
+          break;
+        }
+      }
+
+      if (!allDone) {
+        alert(`Please complete all ${commandWords.length} recordings on this page before moving to the next.`);
+        return;
+      }
+
+      if (currentPage < 5) {
+        currentPage++;
+        renderPage();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    function prevPage() {
+      if (isRecordingGlobal) {
+        alert("Please stop recording before changing pages.");
+        return;
+      }
+      if (currentPage > 0) {
+        currentPage--;
+        renderPage();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    async function downloadZip() {
+      if (Object.keys(recordings).length === 0) {
+        alert('No recordings found');
+        return;
+      }
+
+      const zip = new JSZip();
+
+      Object.values(recordings).forEach(record => {
+        zip.file(`${record.text}/${record.filename}`, record.blob);
+      });
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      saveAs(content, `hey_genie_dataset_${speakerId}_${userGender.toLowerCase()}.zip`);
+    }
+
+    async function shareZip() {
+      const zip = new JSZip();
+
+      Object.values(recordings).forEach(record => {
+        zip.file(`${record.text}/${record.filename}`, record.blob);
+      });
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      const file = new File([content], `hey_genie_dataset_${speakerId}_${userGender.toLowerCase()}.zip`, {
+        type: 'application/zip'
+      });
+
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: 'Hey Genie Voice Dataset',
+          text: `Voice Dataset Recordings for ${speakerId}`,
+          files: [file]
+        });
+      } else {
+        alert('Sharing not supported on this browser/device');
+      }
+    }
+
+    function mergeBuffers(buffers) {
+      let length = 0;
+      buffers.forEach(b => { length += b.length; });
+      let result = new Float32Array(length);
+      let offset = 0;
+      buffers.forEach(b => {
+        result.set(b, offset);
+        offset += b.length;
+      });
+      return result;
+    }
+
+    function encodeWAV(buffers, sampleRate) {
+      const samples = mergeBuffers(buffers);
+      const buffer = new ArrayBuffer(44 + samples.length * 2);
+      const view = new DataView(buffer);
+
+      writeString(view, 0, 'RIFF');
+      view.setUint32(4, 36 + samples.length * 2, true);
+      writeString(view, 8, 'WAVE');
+      writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(view, 36, 'data');
+      view.setUint32(40, samples.length * 2, true);
+
+      floatTo16BitPCM(view, 44, samples);
+      return new Blob([view], { type: 'audio/wav' });
+    }
+
+    function floatTo16BitPCM(output, offset, input) {
+      for (let i = 0; i < input.length; i++, offset += 2) {
+        let s = Math.max(-1, Math.min(1, input[i]));
+        output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+    }
+
+    function writeString(view, offset, string) {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    }
+
+  </script>
+
+</body>
+
+</html>
