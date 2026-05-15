@@ -349,6 +349,7 @@
     <div class="setup-box">
       <h2>Welcome to Biswas Tech Audio Recorder</h2>
       <p>Please enter your details to start recording.</p>
+      <input type="text" id="userNameInput" placeholder="Enter your full name" required />
       <input type="text" id="speakerIdInput" placeholder="Enter Speaker ID (e.g. spk001)" required />
       <select id="userGenderInput" required>
         <option value="" disabled selected>Select Gender</option>
@@ -459,6 +460,7 @@
     let currentRecorderData = [];
 
     // New State Variables
+    let userName = "";
     let speakerId = "";
     let userGender = "";
     let userAge = "";
@@ -467,22 +469,24 @@
     let isRecordingGlobal = false;
 
     function startApp() {
+      const nameInput = document.getElementById('userNameInput').value.trim();
       const speakerIdInput = document.getElementById('speakerIdInput').value.trim();
       const genderInput = document.getElementById('userGenderInput').value;
       const ageInput = document.getElementById('userAgeInput').value.trim();
       const regionInput = document.getElementById('userRegionInput').value.trim();
 
-      if (!speakerIdInput || !genderInput || !ageInput || !regionInput) {
+      if (!nameInput || !speakerIdInput || !genderInput || !ageInput || !regionInput) {
         alert("Please fill all details to continue.");
         return;
       }
 
+      userName = nameInput.replace(/[^a-zA-Z0-9]/g, '_');
       speakerId = speakerIdInput.replace(/[^a-zA-Z0-9]/g, '');
       userGender = genderInput;
       userAge = ageInput.replace(/[^0-9]/g, '');
       userRegion = regionInput.replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
 
-      const distances = [15, 20, 25];
+      const distances = [10, 15, 20];
       sessionDistance = distances[Math.floor(Math.random() * distances.length)] + "cm";
 
       document.getElementById('setupOverlay').style.display = 'none';
@@ -706,7 +710,7 @@
       });
 
       const content = await zip.generateAsync({ type: 'blob' });
-      saveAs(content, `hey_genie_dataset_${speakerId}_${userGender.toLowerCase()}.zip`);
+      saveAs(content, `${userName}_${speakerId}.zip`);
     }
 
     async function shareZip() {
@@ -717,14 +721,14 @@
       });
 
       const content = await zip.generateAsync({ type: 'blob' });
-      const file = new File([content], `hey_genie_dataset_${speakerId}_${userGender.toLowerCase()}.zip`, {
+      const file = new File([content], `${userName}_${speakerId}.zip`, {
         type: 'application/zip'
       });
 
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({
           title: 'Hey Genie Voice Dataset',
-          text: `Voice Dataset Recordings for ${speakerId}`,
+          text: `Voice Dataset Recordings for ${userName} (${speakerId})`,
           files: [file]
         });
       } else {
